@@ -1,0 +1,21 @@
+<ul class="nav navbar-nav navbar-right">
+
+    <li class="nav-item dropdown pl-2 mt-3">
+        
+        <div class="dropdown-menu">
+          <a class="nav-link" href="{% url 'app_news_rcmd_bert:home' %}">相關新聞推薦(Bert)</a>
+          <a class="nav-link" href="#">相關新聞推薦(Doc2vec)</a>
+          <a class="nav-link" href="#">新聞或文章情緒分類</a>
+          <a class="nav-link" href="#">新聞分類新聞分類</a>
+          <div class="dropdown-divider"></div>
+          {% comment %} <a class="nav-link" href="{% url 'course_introduction' %}">課程介紹</a> {% endcomment %}
+        </div>
+      </li>
+  <li class="nav-item dropdown pl-2 mt-3">
+    
+    <div class="dropdown-menu">
+      <a class="dropdown-item" href="#">登入</a>
+      <a class="dropdown-item" href="#">註冊</a>
+    </div>
+  </li>
+</ul>

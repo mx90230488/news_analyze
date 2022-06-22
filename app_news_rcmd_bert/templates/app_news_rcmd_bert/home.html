@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>輿情分析平台</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+    />
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+
+    <!-- css style for displaying news content and the number of lines to be displayed -->
+    <style>
+      .only-some-lines-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 12;
+        /* number of lines to show */
+        -webkit-box-orient: vertical;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="row">
+        {% include 'navbar.html' %}
+        {% comment %} {% include 'navbar.html' %} {% endcomment %}
+
+        <div class="col-lg-12">
+          <nav
+            class="navbar navbar-expand-lg navbar-light"
+            style="background-color: #e3f2fd"
+          >
+            <a class="navbar-brand" href="/">相似新聞推薦(BERT模型)</a>
+            <button
+              class="navbar-toggler"
+              type="button"
+              data-toggle="collapse"
+              data-target="#navbarSupportedContent"
+              aria-controls="navbarSupportedContent"
+              aria-expanded="false"
+              aria-label="Toggle navigation"
+            >
+              <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+              <ul class="navbar-nav mr-auto">
+                <li class="nav-item pl-2 mt-3">
+                  <div class="form-group row">
+                    <div class="col-md-12 select">
+                      <select
+                        id="cate_select"
+                        name="news_category"
+                        class="form-control"
+                      >
+                        <option>台股</option>
+                        <option>國際股</option>
+                        <option>陸港股</option>
+                        <option>區塊鏈</option>
+                        <option>外匯</option>
+                        <option>期貨</option>
+                        
+
+                      </select>
+                    </div>
+                  </div>
+                </li>
+
+                <li class="nav-item active pl-2 mt-3">
+                  <div class="input-group">
+                    <input
+                      type="text"
+                      id="input_keywords"
+                      class="form-control"
+                      placeholder="可輸入多個關鍵字組合(空白分隔)"
+                    />
+                    <div class="input-group-append">
+                      <button
+                        type="button"
+                        class="btn btn-outline-success"
+                        id="btn_keyword_search"
+                      >
+                        全文檢索
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+
+              <!-- 插入右邊導覽選單 -->
+              {% include 'navbar-right.html' %}
+            </div>
+          </nav>
+        </div>
+
+        <!-- col-lg-6 .. card -->
+        <div class="col-lg-5 mb-2">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="h6 text-uppercase mb-0">最新新聞瀏覽</h3>
+            </div>
+            <div class="card-body">
+              <div id="page_nav"></div>
+
+              <ul class="list-group" id="cate_news"></ul>
+            </div>
+          </div>
+        </div>
+        <!-- column -->
+
+        <div class="col-lg-7 mb-5">
+          <div class="row">
+            <!-- column col-lg-6 .. card -->
+            <div class="col-lg-12 mb-5">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="h6 text-uppercase mb-0">新聞內容</h3>
+                </div>
+                <div class="card-body">
+                  <!-- 顯示被點選的某一篇新聞詳細內容-->
+                  <ul id="news_content"></ul>
+                </div>
+              </div>
+            </div>
+            <!-- column -->
+
+            <!-- column col-lg- .. card -->
+            <div class="col-lg-12 mb-2">
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="h6 text-uppercase mb-0">
+                    推薦與這一則新聞最相似的3篇新聞
+                  </h3>
+                </div>
+                <div class="card-body">
+                  <!-- 顯示被點選的某一篇新聞的相關3篇新聞推薦-->
+                  <ul id="related_news"></ul>
+                </div>
+              </div>
+            </div>
+            <!-- column -->
+          </div>
+          <!-- row -->
+        </div>
+        <!-- right content area -->
+      </div>
+    </div>
+  </body>
+</html>
+
+<!-- paginating.js is located on the local static folder -->
+<script type="text/javascript" src="/static/pagination_bs4.js"></script>
+
+<script>
+  // default user keywords
+  $("#input_keywords").val("烏克蘭");
+  $("#cate_select").val("國際股");
+
+  // show news links info. when this page is loaded
+  show_news_link(); // based on the selected category
+  //show_suggested_news_link(); // based on the user keywords
+
+  // on change event for category selection
+  $("#cate_select").on("change", function () {
+    show_news_link();
+  });
+  // on change event for category selection
+  $("#btn_keyword_search").on("click", function () {
+    show_news_link();
+  });
+
+  // function triggered when the news category is changed
+  function show_news_link() {
+    const cate = $("#cate_select").val();
+    const input_keywords = $("#input_keywords").val();
+
+    // remove previous "cate_news" by one of the following approaches:
+    // Approach 1: use jQuery statement
+    $("#cate_news").empty();
+
+    // Approach 2: use html statement
+    //var target_div = document.getElementById("cate_news");
+    //target_div.innerHTML = '';
+
+    // Ajax
+    $.ajax({
+      type: "POST",
+      url: "api_query_keyword_cate_news/",
+      data: {
+        'category': cate,
+        'input_keywords': input_keywords,
+      },
+      success: function (received) {
+        // get latest categorical news
+        const items = received["latest_news"];
+
+        //let html_div = document.createElement('div');
+        let html_div = document.getElementById("cate_news");
+
+        // display all of them in tag "cate_news"
+        for (let i = 0; i < items.length; i++) {
+          // prepare html snippet for each news
+          let html_snippet = `<li class="list-group-item">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h5><small><a class="read_it" news_id={0} href="#">{1}</a></small><h5>
+                                </div>
+                                <div class="col-md-4">
+                                    <a href="{2}" target="_blank">
+                                        <img class="img-fluid rounded mb-3 mb-md-0" src="{3}" width="120">
+                                    </a>
+                                </div>
+                            </div>
+                        </li>`;
+          // insert news data to the html_snippet
+          html_snippet = html_snippet.format(
+            items[i].id,
+            items[i].title,
+            items[i].link,
+            items[i].photo_link,
+          );
+          // paste every html_snippet into html_div
+          html_div.innerHTML += html_snippet;
+        }
+
+        // append the heml_div to display
+        //$('#cate_news').append(html_div);
+        //document.getElementById('cate_news').appendChild(html_div);
+
+        // Remove previous displayed news by clear_news_content()
+        clear_news_content();
+
+        //clear the paging area
+        $(".pagination-container-cate-news").empty();
+
+        // process pagination
+        paginate_cate_news();
+
+        // show content of the first news
+        showNews(items[0].id);
+      }, //success function
+    }); //ajax
+  }
+
+  // Remove the previous displayed news
+  var clear_news_content = function () {
+    $("#news_content").empty();
+    $("#related_news").empty();
+  };
+
+  // paging for news list
+  function paginate_cate_news() {
+    //https://github.com/AlexisHolyoak/paginathing
+    $("#cate_news").paginathing({
+      perPage: 8, // show item per page
+      insertAfter: "#page_nav", //class or id (eg: .element or #element). append the paginator after certain element
+
+      limitPagination: 4, // false or number. Limiting your pagination number.
+      pageNumbers: true, // showing current page number of total pages number, to work properly limitPagination must be true
+      prevNext: true, // enable previous and next button
+      firstLast: true, // enable first and last button
+      prevText: "&laquo;", // Previous button text
+      nextText: "&raquo;", // Next button text
+      firstText: "First", // "First button" text
+      lastText: "Last", // "Last button" text
+      containerClass: "pagination-container-cate-news", // extend default container class
+      ulClass: "pagination", // extend default ul class
+      liClass: "page", // extend li class
+      activeClass: "active", // active link class
+      disabledClass: "disable", // disabled link class,
+    });
+  }
+
+  // Define the on click function for every news link
+  // We must use a document event listener, because the read_it tags are dynamically generated.
+  // 針對整個頁面的監聽事件，對於動態產生的element也能監聽到
+  $(document).on("click", "a.read_it", function () {
+    //console.log('read this!'); //test if the event is triggered
+
+    // get news_id.
+    // "this" refer to the read_it html element as the following:
+    // <li><a class='read_it' news_id="cna_xxx"  href='#'>...</a></li>
+    const newsid = $(this).attr("news_id");
+    //console.log(newsid); //news_id
+
+    // change the color of "this" html
+    $(this).css("background", "#d9f531");
+
+    // show the selected news content by showNews()
+    showNews(newsid);
+  });
+
+  // We could not define read_it event in advance. because read_it tag is dynamically generated when this page is loaded.
+  //以下這種寫法沒作用，由於read_it是動態產生的，這個事件無法被觸發!!
+  $(".read_it").click(function () {
+    //alert("this event will not be triggered!");
+  });
+
+  // Show the selected news content when the read_it event is triggered
+  var showNews = function (news_id) {
+    clear_news_content();
+
+    $.ajax({
+      type: "POST",
+      url: "api_news_content/",
+      data: {
+        news_id: news_id, // query by news_id
+      },
+      success: function (received) {
+        const item = received["news_content"]; // get news content
+        // const item = received.news_content; // the same
+
+        // the html element to display the new content
+        const display = $("#news_content");
+        //const display = document.getElementById("news_content"); // alternative way
+
+        // insert new line at the end of paragraph
+        html_content = item.content.replace(/(\r\n|\n|\r|。)/gm, "。<br><br>");
+
+        // display new content
+        display.append("<li>類別:" + item.category + "</li>");
+        display.append(
+          "<p>標題:" + item.title + "(" + item.date + ")" + "</p>"
+        );
+        display.append(
+          "<p class = 'only-some-lines-text'>" + html_content + "</p>"
+        );
+        display.append("<a  href=" + item.link + " target='_blank'>連結</a>");
+
+        // display similar (related) news based on the selected news
+        var items = received["related_news"];
+        var display_rel = document.getElementById("related_news");
+        for (var i = 0; i < items.length; i++) {
+          display_rel.innerHTML += "<li>" + items[i].category + "</li>";
+          display_rel.innerHTML += "<p>" + items[i].title + "</p>";
+          display_rel.innerHTML += "<p>相似度:" + items[i].score + "</p>";
+          display_rel.innerHTML +=
+            "<a  href=" + items[i].link + " target='_blank'>連結</a>";
+        }
+      },
+    }); //ajax
+  }; //showNews function
+
+  //Customize the String.format()
+  //reference: https://www.cnblogs.com/taoweiji/p/3260883.html
+
+  //"{0}----{1}".format("xx","yy")
+  String.prototype.format = function () {
+    var result = this;
+    if (arguments.length == 0) return null;
+    for (var i = 0; i < arguments.length; i++) {
+      var re = new RegExp("\\{" + i + "\\}", "gm");
+      result = result.replace(re, arguments[i]);
+    }
+    return result;
+  };
+</script>
